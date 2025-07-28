@@ -247,17 +247,7 @@
 
         function getIconUrl(symbol) {
             const baseUrl = 'https://raw.githubusercontent.com/nrkno/yr-weather-symbols/main/dist/svg/';
-            const urlWithSuffix = `${baseUrl}${symbol}.svg`;
-            const urlWithoutSuffix = `${baseUrl}${symbol.replace('_day', '').replace('_night', '')}.svg`;
-
-            // We can't make a real network request here to check for existence,
-            // so we will rely on a predefined list of icons that have suffixes.
-            const iconsWithSuffixes = ['clearsky', 'cloudy', 'fair', 'heavyrain', 'heavyrainandthunder', 'heavyrainshowers', 'heavyrainshowersandthunder', 'heavysleet', 'heavysleetandthunder', 'heavysleetshowers', 'heavysleetshowersandthunder', 'heavysnow', 'heavysnowandthunder', 'heavysnowshowers', 'heavysnowshowersandthunder', 'lightrain', 'lightrainandthunder', 'lightrainshowers', 'lightrainshowersandthunder', 'lightsleet', 'lightsleetandthunder', 'lightsleetshowers', 'lightsnow', 'lightsnowandthunder', 'lightsnowshowers', 'lightssleetshowersandthunder', 'lightssnowshowersandthunder', 'partlycloudy', 'rain', 'rainandthunder', 'rainshowers', 'rainshowersandthunder', 'sleet', 'sleetandthunder', 'sleetshowers', 'sleetshowersandthunder', 'snow', 'snowandthunder', 'snowshowers', 'snowshowersandthunder'];
-
-            if (iconsWithSuffixes.includes(symbol.replace('_day', '').replace('_night', ''))) {
-                return urlWithSuffix;
-            }
-            return urlWithoutSuffix;
+            return `${baseUrl}${symbol}.svg`;
         }
 
         function renderBodyWithData(forecasts) {
