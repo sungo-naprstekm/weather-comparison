@@ -255,7 +255,7 @@
                 forecasts.forEach((locForecast, locIndex) => {
                     if (locForecast?.[dayIndex]) {
                         const day = locForecast[dayIndex];
-                        const iconUrl = `https://raw.githubusercontent.com/nrkno/yr-weather-symbols/main/dist/svg/${day.symbol}.svg`;
+                        const iconUrl = `https://raw.githubusercontent.com/nrkno/yr-weather-symbols/main/dist/svg/${day.symbol.replace('_day', '').replace('_night', '')}.svg`;
                         bodyHTML += `<td class="p-3"><div class="flex flex-col items-center">
                             <img src="${iconUrl}" alt="${day.symbol}" class="weather-icon">
                             <div class="font-semibold mt-1">${day.maxTemp}°</div>
