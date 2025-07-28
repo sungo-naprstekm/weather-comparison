@@ -79,7 +79,7 @@
         <div class="flex justify-center mb-6">
             <div id="source-toggle" class="flex rounded-lg">
                 <label class="source-toggle-label rounded-l-lg" data-source="metno">MET Norway</label>
-                <label class="source-toggle-label rounded-r-lg" data-source="meteosource">Meteosource</label>
+                <label class="source-toggle-label rounded-r-lg" data-source="windy">Windy</label>
             </div>
         </div>
 
@@ -124,8 +124,10 @@
         let debounceTimer;
         let currentDataSource = 'metno';
 
-        // !!! DŮLEŽITÉ: Vložte svůj Meteosource API klíč zde !!!
-        const METEOSOURCE_API_KEY = 'YOUR_API_KEY_HERE';
+        // --- API klíče ---
+        // Toto je placeholder. Pro nasazení na Vercel se tento řádek nahradí pomocí Environment Variable.
+        // Pro lokální testování sem můžete dočasně vložit svůj klíč.
+        const WINDY_API_KEY = 'YOUR_API_KEY_HERE';
 
         // --- API Calls ---
 
@@ -139,7 +141,7 @@
 
         async function getMetNoWeatherData(lat, lon) {
             const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat}&lon=${lon}`;
-            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/MultiSource-Persistent https://example.com' });
+            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/WindyIntegration https://example.com' });
             try {
                 const response = await fetch(url, { headers });
                 if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
@@ -148,18 +150,29 @@
             } catch (error) { console.error(`Error fetching MET Norway data for ${lat}, ${lon}:`, error); return null; }
         }
 
-        async function getMeteosourceWeatherData(lat, lon) {
-            if (METEOSOURCE_API_KEY === 'YOUR_API_KEY_HERE') {
-                console.error('Meteosource API klíč není nastaven.');
+        async function getWindyWeatherData(lat, lon) {
+            if (WINDY_API_KEY === 'YOUR_API_KEY_HERE') {
+                console.error('Windy API klíč není nastaven.');
                 return null;
             }
-            const url = `https://www.meteosource.com/api/v1/free/point?lat=${lat}&lon=${lon}&sections=daily&units=metric&key=${METEOSOURCE_API_KEY}`;
+            const url = `https://api.windy.com/api/point-forecast/v2`;
+            const payload = {
+                lat: lat,
+                lon: lon,
+                model: "gfs", // Běžný globální model
+                parameters: ["temp", "wind", "precip", "icon"],
+                key: WINDY_API_KEY
+            };
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
                 const data = await response.json();
-                return processMeteosourceForecast(data.daily.data);
-            } catch (error) { console.error(`Error fetching Meteosource data for ${lat}, ${lon}:`, error); return null; }
+                return processWindyForecast(data);
+            } catch (error) { console.error(`Error fetching Windy data for ${lat}, ${lon}:`, error); return null; }
         }
 
         // --- Zpracování dat z různých API ---
@@ -182,13 +195,22 @@
                     case 'fog': return 'fa-solid fa-smog';
                     default: return symbolCode.includes('thunder') ? 'fa-solid fa-cloud-bolt' : 'fa-solid fa-cloud';
                 }
-            } else { // meteosource
-                switch (symbolCode) {
-                    case 2: return 'fa-solid fa-sun'; case 3: return 'fa-solid fa-cloud-sun';
-                    case 4: return 'fa-solid fa-cloud'; case 5: return 'fa-solid fa-smog';
-                    case 6: case 7: case 8: return 'fa-solid fa-cloud-rain';
-                    case 10: return 'fa-solid fa-cloud-showers-heavy'; case 11: return 'fa-solid fa-cloud-bolt';
-                    case 12: return 'fa-solid fa-cloud-meatball'; case 13: case 14: return 'fa-solid fa-snowflake';
+            } else { // windy
+                const code = symbolCode.substring(2); // Odstranění 'wi-' prefixu
+                switch (code) {
+                    case 'day-sunny': return 'fa-solid fa-sun';
+                    case 'day-cloudy': return 'fa-solid fa-cloud-sun';
+                    case 'cloudy': return 'fa-solid fa-cloud';
+                    case 'day-showers': return 'fa-solid fa-cloud-sun-rain';
+                    case 'showers': return 'fa-solid fa-cloud-showers-heavy';
+                    case 'day-rain': return 'fa-solid fa-cloud-sun-rain';
+                    case 'rain': return 'fa-solid fa-cloud-showers-heavy';
+                    case 'day-thunderstorm': return 'fa-solid fa-cloud-bolt';
+                    case 'thunderstorm': return 'fa-solid fa-cloud-bolt';
+                    case 'day-snow': return 'fa-solid fa-snowflake';
+                    case 'snow': return 'fa-solid fa-snowflake';
+                    case 'day-fog': return 'fa-solid fa-smog';
+                    case 'fog': return 'fa-solid fa-smog';
                     default: return 'fa-solid fa-question-circle';
                 }
             }
@@ -225,12 +247,47 @@
             return forecast.slice(0, 10);
         }
 
-        function processMeteosourceForecast(dailyData) {
-            return dailyData.map(day => ({
-                date: day.day, minTemp: Math.round(day.min_temp), maxTemp: Math.round(day.max_temp),
-                symbol: day.icon, maxWind: day.wind.speed.toFixed(1),
-                totalPrecipitation: day.precipitation.total.toFixed(1), source: 'meteosource'
-            })).slice(0, 10);
+        function processWindyForecast(data) {
+            const groupedByDate = {};
+            const timestamps = data['ts'];
+            const temps = data['temp-surface'];
+            const winds = data['wind-surface'];
+            const precips = data['precip-surface'];
+            const icons = data['icon-surface'];
+
+            for (let i = 0; i < timestamps.length; i++) {
+                const date = new Date(timestamps[i]).toISOString().split('T')[0];
+                if (!groupedByDate[date]) groupedByDate[date] = [];
+                groupedByDate[date].push({
+                    temp: temps[i],
+                    wind: winds[i],
+                    precip: precips[i],
+                    icon: icons[i]
+                });
+            }
+
+            const forecast = [];
+            for (const date in groupedByDate) {
+                const dayEntries = groupedByDate[date];
+                if (dayEntries.length === 0) continue;
+
+                const dayTemps = dayEntries.map(e => e.temp);
+                const dayWinds = dayEntries.map(e => e.wind);
+                
+                // Windy API dává srážky v 3h intervalech, tak je sečteme
+                const totalPrecipitation = dayEntries.map(e => e.precip).reduce((a, b) => a + b, 0);
+
+                forecast.push({
+                    date: date,
+                    minTemp: Math.round(Math.min(...dayTemps)),
+                    maxTemp: Math.round(Math.max(...dayTemps)),
+                    symbol: dayEntries[Math.floor(dayEntries.length / 2)].icon, // Ikonu vezmeme z prostředka dne
+                    maxWind: Math.max(...dayWinds).toFixed(1),
+                    totalPrecipitation: totalPrecipitation.toFixed(1),
+                    source: 'windy'
+                });
+            }
+            return forecast.slice(0, 10);
         }
 
         // --- UI Rendering ---
@@ -245,7 +302,7 @@
             }
             renderHeader();
             renderBodyWithLoading();
-            const dataFetcher = currentDataSource === 'metno' ? getMetNoWeatherData : getMeteosourceWeatherData;
+            const dataFetcher = currentDataSource === 'metno' ? getMetNoWeatherData : getWindyWeatherData;
             const allForecasts = await Promise.all(locations.map(loc => dataFetcher(loc.lat, loc.lon)));
             renderBodyWithData(allForecasts);
         }
@@ -275,7 +332,7 @@
             let bodyHTML = '';
             const numDays = forecasts.length > 0 && forecasts[0] ? forecasts[0].length : 0;
             if (numDays === 0) {
-                tableBody.innerHTML = `<tr><td colspan="${locations.length + 1}" class="p-4 text-center text-red-500">Nepodařilo se načíst data. Zkontrolujte API klíč pro Meteosource nebo zkuste jiný zdroj.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="${locations.length + 1}" class="p-4 text-center text-red-500">Nepodařilo se načíst data. Zkontrolujte API klíč pro Windy nebo zkuste jiný zdroj.</td></tr>`;
                 return;
             }
             for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
@@ -405,7 +462,6 @@
             if (savedLocations) {
                 locations = JSON.parse(savedLocations);
             } else {
-                // Výchozí lokality, pokud nic není uloženo
                 locations = [ { name: "Praha", lat: 50.07, lon: 14.43 }, { name: "Brno", lat: 49.19, lon: 16.60 } ];
             }
 
@@ -429,7 +485,7 @@
             if (currentDataSource === 'metno') {
                 footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.met.no/" target="_blank" class="text-blue-600 hover:underline">MET Norway</a>.`;
             } else {
-                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.meteosource.com/" target="_blank" class="text-blue-600 hover:underline">Meteosource</a>.`;
+                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.windy.com/" target="_blank" class="text-blue-600 hover:underline">Windy.com</a>.`;
             }
         }
         
