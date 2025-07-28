@@ -8,13 +8,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
         .weather-icon {
-            width: 40px;
-            height: 40px;
+            font-size: 40px; /* Adjust size as needed */
             margin: 0 auto;
         }
         .loader {
@@ -246,8 +246,85 @@
         }
 
         function getIconUrl(symbol) {
-            const baseUrl = 'https://cdn.jsdelivr.net/gh/nrkno/yr-weather-symbols@main/dist/svg/';
-            return `${baseUrl}${symbol}.svg`;
+            const weatherIconMap = {
+                "clearsky_day": "fa-solid fa-sun",
+                "clearsky_night": "fa-solid fa-moon",
+                "cloudy": "fa-solid fa-cloud",
+                "fair_day": "fa-solid fa-cloud-sun",
+                "fair_night": "fa-solid fa-cloud-moon",
+                "fog": "fa-solid fa-smog",
+                "heavyrain": "fa-solid fa-cloud-showers-heavy",
+                "heavyrainandthunder": "fa-solid fa-cloud-bolt",
+                "heavyrainshowers_day": "fa-solid fa-cloud-showers-heavy",
+                "heavyrainshowers_night": "fa-solid fa-cloud-showers-heavy",
+                "heavysleet": "fa-solid fa-cloud-meatball", // Closest for sleet
+                "heavysleetandthunder": "fa-solid fa-cloud-bolt", // Closest for sleet with thunder
+                "heavysleetshowers_day": "fa-solid fa-cloud-meatball",
+                "heavysleetshowers_night": "fa-solid fa-cloud-meatball",
+                "heavysnow": "fa-solid fa-snowflake",
+                "heavysnowandthunder": "fa-solid fa-cloud-bolt", // Closest for snow with thunder
+                "heavysnowshowers_day": "fa-solid fa-snowflake",
+                "heavysnowshowers_night": "fa-solid fa-snowflake",
+                "lightrain": "fa-solid fa-cloud-rain",
+                "lightrainandthunder": "fa-solid fa-cloud-bolt",
+                "lightrainshowers_day": "fa-solid fa-cloud-rain",
+                "lightrainshowers_night": "fa-solid fa-cloud-rain",
+                "lightsleet": "fa-solid fa-cloud-meatball",
+                "lightsleetandthunder": "fa-solid fa-cloud-bolt",
+                "lightsleetshowers_day": "fa-solid fa-cloud-meatball",
+                "lightsleetshowers_night": "fa-solid fa-solid fa-cloud-meatball",
+                "lightsnow": "fa-solid fa-snowflake",
+                "lightsnowandthunder": "fa-solid fa-cloud-bolt",
+                "lightsnowshowers_day": "fa-solid fa-snowflake",
+                "lightsnowshowers_night": "fa-solid fa-snowflake",
+                "partlycloudy_day": "fa-solid fa-cloud-sun",
+                "partlycloudy_night": "fa-solid fa-cloud-moon",
+                "rain": "fa-solid fa-cloud-rain",
+                "rainandthunder": "fa-solid fa-cloud-bolt",
+                "rainshowers_day": "fa-solid fa-cloud-rain",
+                "rainshowers_night": "fa-solid fa-cloud-rain",
+                "sleet": "fa-solid fa-cloud-meatball",
+                "sleetandthunder": "fa-solid fa-cloud-bolt",
+                "sleetshowers_day": "fa-solid fa-cloud-meatball",
+                "sleetshowers_night": "fa-solid fa-cloud-meatball",
+                "snow": "fa-solid fa-snowflake",
+                "snowandthunder": "fa-solid fa-cloud-bolt",
+                "snowshowers_day": "fa-solid fa-snowflake",
+                "snowshowers_night": "fa-solid fa-snowflake",
+                "partlycloudy": "fa-solid fa-cloud-sun", // Fallback for generic partlycloudy
+                "fair": "fa-solid fa-cloud-sun", // Fallback for generic fair
+                "lightssleetshowersandthunder": "fa-solid fa-cloud-bolt",
+                "lightssnowshowersandthunder": "fa-solid fa-cloud-bolt",
+                "thunderstorm": "fa-solid fa-cloud-bolt",
+                "lightrainshowers": "fa-solid fa-cloud-rain",
+                "rainshowers": "fa-solid fa-cloud-rain",
+                "sleetshowers": "fa-solid fa-cloud-meatball",
+                "snowshowers": "fa-solid fa-snowflake",
+                "heavyrainshowers": "fa-solid fa-cloud-showers-heavy",
+                "heavysleetshowers": "fa-solid fa-cloud-meatball",
+                "heavysnowshowers": "fa-solid fa-snowflake",
+                "lightssleetshowers": "fa-solid fa-cloud-meatball",
+                "lightssnowshowers": "fa-solid fa-snowflake",
+                "lightrainandthunder": "fa-solid fa-cloud-bolt",
+                "rainandthunder": "fa-solid fa-cloud-bolt",
+                "sleetandthunder": "fa-solid fa-cloud-bolt",
+                "snowandthunder": "fa-solid fa-cloud-bolt",
+                "heavyrainandthunder": "fa-solid fa-cloud-bolt",
+                "heavysleetandthunder": "fa-solid fa-cloud-bolt",
+                "heavysnowandthunder": "fa-solid fa-cloud-bolt",
+                "lightssleetandthunder": "fa-solid fa-cloud-bolt",
+                "lightssnowandthunder": "fa-solid fa-cloud-bolt",
+                "lightrainshowersandthunder": "fa-solid fa-cloud-bolt",
+                "rainshowersandthunder": "fa-solid fa-cloud-bolt",
+                "sleetshowersandthunder": "fa-solid fa-cloud-bolt",
+                "snowshowersandthunder": "fa-solid fa-cloud-bolt",
+                "heavyrainshowersandthunder": "fa-solid fa-cloud-bolt",
+                "heavysleetshowersandthunder": "fa-solid fa-cloud-bolt",
+                "heavysnowshowersandthunder": "fa-solid fa-cloud-bolt",
+                "lightssleetshowersandthunder": "fa-solid fa-cloud-bolt",
+                "lightssnowshowersandthunder": "fa-solid fa-cloud-bolt",
+            };
+            return weatherIconMap[symbol] || "fa-solid fa-question"; // Default icon for unknown symbols
         }
 
         function renderBodyWithData(forecasts) {
@@ -260,9 +337,9 @@
                 forecasts.forEach((locForecast, locIndex) => {
                     if (locForecast?.[dayIndex]) {
                         const day = locForecast[dayIndex];
-                        const iconUrl = getIconUrl(day.symbol);
+                        const iconClass = getIconUrl(day.symbol);
                         bodyHTML += `<td class="p-3"><div class="flex flex-col items-center">
-                            <img src="${iconUrl}" alt="${day.symbol}" class="weather-icon">
+                            <i class="weather-icon ${iconClass}"></i>
                             <div class="font-semibold mt-1">${day.maxTemp}°</div>
                             <div class="text-gray-500">${day.minTemp}°</div>
                             <div class="mt-2 gemini-btn" onclick="showAiModal(${locIndex}, ${dayIndex})" title="Získat slovní předpověď">✨</div>
