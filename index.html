@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Porovnání počasí</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Integrace Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,10 +14,10 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        .weather-icon {
-            width: 40px;
-            height: 40px;
+        .weather-icon-fa {
+            font-size: 40px;
             margin: 0 auto;
+            color: #3b82f6; /* Modrá barva pro ikony */
         }
         .loader {
             border: 4px solid #f3f3f3;
@@ -107,7 +109,7 @@
 
         async function getWeatherData(lat, lon) {
             const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat}&lon=${lon}`;
-            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/Simple https://example.com' });
+            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/FontAwesome https://example.com' });
             try {
                 const response = await fetch(url, { headers });
                 if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
@@ -117,14 +119,37 @@
         
         // --- Data Processing ---
 
+        // Mapování symbolů z API na Font Awesome ikony
+        function getFontAwesomeIcon(symbolCode) {
+            if (!symbolCode) return 'fa-solid fa-question-circle'; // Výchozí ikona
+
+            const code = symbolCode.split('_')[0]; // Získání základního kódu (např. 'heavyrain' z 'heavyrainandthunder')
+
+            switch (code) {
+                case 'clearsky': return 'fa-solid fa-sun';
+                case 'fair': return 'fa-solid fa-cloud-sun';
+                case 'partlycloudy': return 'fa-solid fa-cloud-sun';
+                case 'cloudy': return 'fa-solid fa-cloud';
+                case 'lightrain': return 'fa-solid fa-cloud-rain';
+                case 'rain': return 'fa-solid fa-cloud-showers-heavy';
+                case 'heavyrain': return 'fa-solid fa-cloud-bolt';
+                case 'sleet': return 'fa-solid fa-cloud-meatball';
+                case 'lightsnow': return 'fa-solid fa-snowflake';
+                case 'snow': return 'fa-solid fa-snowflake';
+                case 'heavysnow': return 'fa-solid fa-snowflake';
+                case 'fog': return 'fa-solid fa-smog';
+                default:
+                    if (symbolCode.includes('thunder')) return 'fa-solid fa-cloud-bolt';
+                    return 'fa-solid fa-cloud';
+            }
+        }
+
         function processDailyForecast(timeseries) {
             const groupedByDate = {};
 
             timeseries.forEach(entry => {
                 const date = entry.time.split('T')[0];
-                if (!groupedByDate[date]) {
-                    groupedByDate[date] = [];
-                }
+                if (!groupedByDate[date]) groupedByDate[date] = [];
                 groupedByDate[date].push(entry);
             });
 
@@ -133,24 +158,29 @@
                 const dayEntries = groupedByDate[date];
                 if (dayEntries.length === 0) continue;
 
-                const temps = dayEntries
-                    .map(e => e.data.instant?.details?.air_temperature)
-                    .filter(t => t !== undefined);
+                // Výpočet teplot
+                const temps = dayEntries.map(e => e.data.instant?.details?.air_temperature).filter(t => t !== undefined);
                 if (temps.length === 0) continue;
                 const minTemp = Math.round(Math.min(...temps));
                 const maxTemp = Math.round(Math.max(...temps));
 
+                // Výpočet větru a srážek
+                const winds = dayEntries.map(e => e.data.instant?.details?.wind_speed).filter(w => w !== undefined);
+                const maxWind = winds.length > 0 ? Math.max(...winds).toFixed(1) : '0.0';
+                const precipitations = dayEntries.map(e => e.data.next_1_hours?.details?.precipitation_amount || 0);
+                const totalPrecipitation = precipitations.reduce((a, b) => a + b, 0).toFixed(1);
+
+                // Nalezení symbolu
                 let mainSymbol = 'clearsky_day';
                 const noonEntry = dayEntries.find(e => e.time.startsWith(date + 'T13:00:00'));
                 if (noonEntry?.data?.next_1_hours?.summary?.symbol_code) {
                     mainSymbol = noonEntry.data.next_1_hours.summary.symbol_code;
                 } else {
                     const firstAvailableEntry = dayEntries.find(e => e.data?.next_1_hours?.summary?.symbol_code);
-                    if (firstAvailableEntry) {
-                        mainSymbol = firstAvailableEntry.data.next_1_hours.summary.symbol_code;
-                    }
+                    if (firstAvailableEntry) mainSymbol = firstAvailableEntry.data.next_1_hours.summary.symbol_code;
                 }
-                forecast.push({ date, minTemp, maxTemp, symbol: mainSymbol });
+                
+                forecast.push({ date, minTemp, maxTemp, symbol: mainSymbol, maxWind, totalPrecipitation });
             }
             return forecast.slice(0, 10);
         }
@@ -198,14 +228,17 @@
                 bodyHTML += `<tr class="hover:bg-gray-50 ${dayIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">`;
                 const dateValue = forecasts[0]?.[dayIndex]?.date;
                 bodyHTML += `<td class="p-3 text-left text-gray-700 font-semibold">${getFormattedDate(dayIndex, dateValue)}</td>`;
-                forecasts.forEach((locForecast, locIndex) => {
+                forecasts.forEach((locForecast) => {
                     if (locForecast?.[dayIndex]) {
                         const day = locForecast[dayIndex];
-                        const iconUrl = `https://raw.githubusercontent.com/nrkno/yr-weather-symbols/main/dist/svg/${day.symbol}.svg`;
-                        bodyHTML += `<td class="p-3"><div class="flex flex-col items-center">
-                            <img src="${iconUrl}" alt="${day.symbol}" class="weather-icon">
-                            <div class="font-semibold mt-1">${day.maxTemp}°</div>
-                            <div class="text-gray-500">${day.minTemp}°</div>
+                        const faIconClass = getFontAwesomeIcon(day.symbol);
+                        bodyHTML += `<td class="p-3"><div class="flex flex-col items-center space-y-2">
+                            <i class="${faIconClass} weather-icon-fa"></i>
+                            <div class="font-bold text-lg">${day.maxTemp}° <span class="text-gray-500 font-normal">${day.minTemp}°</span></div>
+                            <div class="text-xs text-gray-600 text-left w-24">
+                                <div><i class="fas fa-wind fa-fw mr-1"></i> ${day.maxWind} m/s</div>
+                                <div><i class="fas fa-tint fa-fw mr-1"></i> ${day.totalPrecipitation} mm</div>
+                            </div>
                         </div></td>`;
                     } else {
                         bodyHTML += '<td class="p-3 text-red-500">Chyba</td>';
