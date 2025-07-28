@@ -15,8 +15,7 @@
             font-family: 'Inter', sans-serif;
         }
         .weather-icon-fa {
-            font-size: 40px;
-            margin: 0 auto;
+            font-size: 28px; /* Zmenšená ikona */
             color: #3b82f6;
         }
         .loader {
@@ -61,6 +60,11 @@
             color: white;
             border-color: #3b82f6;
         }
+        /* Styl pro deaktivovaný formulář */
+        #add-location-form.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -74,7 +78,7 @@
         <!-- Přepínač zdroje dat -->
         <div class="flex justify-center mb-6">
             <div id="source-toggle" class="flex rounded-lg">
-                <label class="source-toggle-label rounded-l-lg active" data-source="metno">MET Norway</label>
+                <label class="source-toggle-label rounded-l-lg" data-source="metno">MET Norway</label>
                 <label class="source-toggle-label rounded-r-lg" data-source="meteosource">Meteosource</label>
             </div>
         </div>
@@ -117,9 +121,8 @@
         const footerSourceText = document.getElementById('footer-source-text');
 
         let locations = [];
-        let forecastsCache = [];
         let debounceTimer;
-        let currentDataSource = 'metno'; // 'metno' nebo 'meteosource'
+        let currentDataSource = 'metno';
 
         // !!! DŮLEŽITÉ: Vložte svůj Meteosource API klíč zde !!!
         const METEOSOURCE_API_KEY = 'YOUR_API_KEY_HERE';
@@ -136,7 +139,7 @@
 
         async function getMetNoWeatherData(lat, lon) {
             const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat}&lon=${lon}`;
-            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/MultiSource https://example.com' });
+            const headers = new Headers({ 'User-Agent': 'MyWeatherTable/MultiSource-Persistent https://example.com' });
             try {
                 const response = await fetch(url, { headers });
                 if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
@@ -146,7 +149,7 @@
         }
 
         async function getMeteosourceWeatherData(lat, lon) {
-            if (METEOSOURCE_API_KEY === 'it5q7xg3t96t7ish8svee8obxaafu7zn0ljjyi6r') {
+            if (METEOSOURCE_API_KEY === 'YOUR_API_KEY_HERE') {
                 console.error('Meteosource API klíč není nastaven.');
                 return null;
             }
@@ -180,20 +183,12 @@
                     default: return symbolCode.includes('thunder') ? 'fa-solid fa-cloud-bolt' : 'fa-solid fa-cloud';
                 }
             } else { // meteosource
-                // Kódy dle dokumentace Meteosource
                 switch (symbolCode) {
-                    case 2: return 'fa-solid fa-sun'; // Mostly Clear
-                    case 3: return 'fa-solid fa-cloud-sun'; // Partly Cloudy
-                    case 4: return 'fa-solid fa-cloud'; // Cloudy
-                    case 5: return 'fa-solid fa-smog'; // Fog
-                    case 6: return 'fa-solid fa-cloud-rain'; // Possible Drizzle
-                    case 7: return 'fa-solid fa-cloud-rain'; // Drizzle
-                    case 8: return 'fa-solid fa-cloud-rain'; // Light Rain
-                    case 10: return 'fa-solid fa-cloud-showers-heavy'; // Rain
-                    case 11: return 'fa-solid fa-cloud-bolt'; // Thunderstorm
-                    case 12: return 'fa-solid fa-cloud-meatball'; // Rain and snow
-                    case 13: return 'fa-solid fa-snowflake'; // Light snow
-                    case 14: return 'fa-solid fa-snowflake'; // Snow
+                    case 2: return 'fa-solid fa-sun'; case 3: return 'fa-solid fa-cloud-sun';
+                    case 4: return 'fa-solid fa-cloud'; case 5: return 'fa-solid fa-smog';
+                    case 6: case 7: case 8: return 'fa-solid fa-cloud-rain';
+                    case 10: return 'fa-solid fa-cloud-showers-heavy'; case 11: return 'fa-solid fa-cloud-bolt';
+                    case 12: return 'fa-solid fa-cloud-meatball'; case 13: case 14: return 'fa-solid fa-snowflake';
                     default: return 'fa-solid fa-question-circle';
                 }
             }
@@ -206,14 +201,12 @@
                 if (!groupedByDate[date]) groupedByDate[date] = [];
                 groupedByDate[date].push(entry);
             });
-
             const forecast = [];
             for (const date in groupedByDate) {
                 const dayEntries = groupedByDate[date];
                 if (dayEntries.length === 0) continue;
                 const temps = dayEntries.map(e => e.data.instant?.details?.air_temperature).filter(t => t !== undefined);
                 if (temps.length === 0) continue;
-                
                 let mainSymbol = 'clearsky_day';
                 const noonEntry = dayEntries.find(e => e.time.startsWith(date + 'T13:00:00'));
                 if (noonEntry?.data?.next_1_hours?.summary?.symbol_code) {
@@ -222,13 +215,9 @@
                     const firstAvailableEntry = dayEntries.find(e => e.data?.next_1_hours?.summary?.symbol_code);
                     if (firstAvailableEntry) mainSymbol = firstAvailableEntry.data.next_1_hours.summary.symbol_code;
                 }
-
                 forecast.push({
-                    date: date,
-                    minTemp: Math.round(Math.min(...temps)),
-                    maxTemp: Math.round(Math.max(...temps)),
-                    symbol: mainSymbol,
-                    maxWind: Math.max(...dayEntries.map(e => e.data.instant?.details?.wind_speed).filter(w => w !== undefined)).toFixed(1),
+                    date: date, minTemp: Math.round(Math.min(...temps)), maxTemp: Math.round(Math.max(...temps)),
+                    symbol: mainSymbol, maxWind: Math.max(...dayEntries.map(e => e.data.instant?.details?.wind_speed).filter(w => w !== undefined)).toFixed(1),
                     totalPrecipitation: dayEntries.map(e => e.data.next_1_hours?.details?.precipitation_amount || 0).reduce((a, b) => a + b, 0).toFixed(1),
                     source: 'metno'
                 });
@@ -238,13 +227,9 @@
 
         function processMeteosourceForecast(dailyData) {
             return dailyData.map(day => ({
-                date: day.day,
-                minTemp: Math.round(day.min_temp),
-                maxTemp: Math.round(day.max_temp),
-                symbol: day.icon,
-                maxWind: day.wind.speed.toFixed(1),
-                totalPrecipitation: day.precipitation.total.toFixed(1),
-                source: 'meteosource'
+                date: day.day, minTemp: Math.round(day.min_temp), maxTemp: Math.round(day.max_temp),
+                symbol: day.icon, maxWind: day.wind.speed.toFixed(1),
+                totalPrecipitation: day.precipitation.total.toFixed(1), source: 'meteosource'
             })).slice(0, 10);
         }
 
@@ -252,6 +237,7 @@
 
         async function renderTable() {
             updateFooter();
+            checkLocationLimit();
             if (locations.length === 0) {
                 tableHeader.innerHTML = '<tr><th class="p-4 font-semibold text-gray-600">Přidejte lokalitu pro zobrazení předpovědi</th></tr>';
                 tableBody.innerHTML = '';
@@ -259,17 +245,15 @@
             }
             renderHeader();
             renderBodyWithLoading();
-
             const dataFetcher = currentDataSource === 'metno' ? getMetNoWeatherData : getMeteosourceWeatherData;
             const allForecasts = await Promise.all(locations.map(loc => dataFetcher(loc.lat, loc.lon)));
-            
             renderBodyWithData(allForecasts);
         }
 
         function renderHeader() {
-            let headerHTML = '<tr><th class="p-3 font-semibold text-left w-36">Datum</th>';
+            let headerHTML = '<tr><th class="p-2 font-semibold text-left w-32">Datum</th>';
             locations.forEach((loc, index) => {
-                headerHTML += `<th class="p-3 font-semibold whitespace-nowrap">${loc.name} <span class="remove-btn" onclick="removeLocation(${index})">×</span></th>`;
+                headerHTML += `<th class="p-2 font-semibold whitespace-nowrap">${loc.name} <span class="remove-btn" onclick="removeLocation(${index})">×</span></th>`;
             });
             headerHTML += '</tr>';
             tableHeader.innerHTML = headerHTML;
@@ -278,9 +262,9 @@
         function renderBodyWithLoading() {
             let bodyHTML = '';
             for (let i = 0; i < 10; i++) {
-                bodyHTML += `<tr><td class="p-3 text-left text-gray-600 font-medium">${getFormattedDate(i)}</td>`;
+                bodyHTML += `<tr><td class="py-2 px-2 text-left text-gray-600 font-medium">${getFormattedDate(i)}</td>`;
                 for (let j = 0; j < locations.length; j++) {
-                    bodyHTML += '<td class="p-3"><div class="flex justify-center"><div class="loader"></div></div></td>';
+                    bodyHTML += '<td class="py-2 px-2"><div class="flex justify-center"><div class="loader"></div></div></td>';
                 }
                 bodyHTML += '</tr>';
             }
@@ -294,25 +278,24 @@
                 tableBody.innerHTML = `<tr><td colspan="${locations.length + 1}" class="p-4 text-center text-red-500">Nepodařilo se načíst data. Zkontrolujte API klíč pro Meteosource nebo zkuste jiný zdroj.</td></tr>`;
                 return;
             }
-
             for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
                 bodyHTML += `<tr class="hover:bg-gray-50 ${dayIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">`;
                 const dateValue = forecasts[0]?.[dayIndex]?.date;
-                bodyHTML += `<td class="p-3 text-left text-gray-700 font-semibold">${getFormattedDate(dayIndex, dateValue)}</td>`;
+                bodyHTML += `<td class="py-2 px-2 text-left text-gray-700 font-semibold">${getFormattedDate(dayIndex, dateValue)}</td>`;
                 forecasts.forEach((locForecast) => {
                     if (locForecast?.[dayIndex]) {
                         const day = locForecast[dayIndex];
                         const faIconClass = getFontAwesomeIcon(day.symbol, day.source);
-                        bodyHTML += `<td class="p-3"><div class="flex flex-col items-center space-y-2">
-                            <i class="${faIconClass} weather-icon-fa"></i>
-                            <div class="font-bold text-lg">${day.maxTemp}° <span class="text-gray-500 font-normal">${day.minTemp}°</span></div>
-                            <div class="text-xs text-gray-600 text-left w-24">
-                                <div><i class="fas fa-wind fa-fw mr-1"></i> ${day.maxWind} m/s</div>
-                                <div><i class="fas fa-tint fa-fw mr-1"></i> ${day.totalPrecipitation} mm</div>
+                        bodyHTML += `<td class="py-2 px-2"><div class="flex items-center justify-start space-x-3 md:space-x-4 w-full">
+                            <div class="w-8 text-center"><i class="${faIconClass} weather-icon-fa"></i></div>
+                            <div class="font-semibold text-base w-16 text-left">${day.maxTemp}°<span class="text-gray-500 font-normal">/${day.minTemp}°</span></div>
+                            <div class="text-xs text-gray-600 flex flex-col">
+                                <span class="whitespace-nowrap"><i class="fas fa-tint fa-fw text-blue-400"></i> ${day.totalPrecipitation} mm</span>
+                                <span class="whitespace-nowrap"><i class="fas fa-wind fa-fw text-gray-400"></i> ${day.maxWind} m/s</span>
                             </div>
                         </div></td>`;
                     } else {
-                        bodyHTML += '<td class="p-3 text-red-500">Chyba</td>';
+                        bodyHTML += '<td class="py-2 px-2 text-red-500">Chyba</td>';
                     }
                 });
                 bodyHTML += '</tr>';
@@ -322,8 +305,7 @@
         
         function renderSuggestions(suggestions) {
             if (!suggestions || suggestions.length === 0) {
-                suggestionsBox.classList.add('hidden');
-                return;
+                suggestionsBox.classList.add('hidden'); return;
             }
             suggestionsBox.innerHTML = '';
             suggestions.forEach(suggestion => {
@@ -339,9 +321,15 @@
         // --- Event Handlers & Helpers ---
 
         function selectSuggestion(suggestion) {
+            errorMessage.textContent = '';
+            if (locations.length >= 5) {
+                errorMessage.textContent = 'Můžete porovnávat maximálně 5 lokalit.';
+                return;
+            }
             const newLocation = { name: suggestion.name, lat: suggestion.latitude, lon: suggestion.longitude };
             if (!locations.some(loc => loc.name === newLocation.name)) {
                 locations.push(newLocation);
+                saveStateToLocalStorage();
                 renderTable();
             }
             locationInput.value = '';
@@ -365,8 +353,7 @@
             clearTimeout(debounceTimer);
             const query = locationInput.value.trim();
             if (query.length < 2) {
-                suggestionsBox.classList.add('hidden');
-                return;
+                suggestionsBox.classList.add('hidden'); return;
             }
             debounceTimer = setTimeout(async () => {
                 const data = await getCitySuggestions(query);
@@ -385,23 +372,15 @@
                 const newSource = e.target.dataset.source;
                 if (newSource !== currentDataSource) {
                     currentDataSource = newSource;
-                    sourceToggle.querySelectorAll('.source-toggle-label').forEach(label => label.classList.remove('active'));
-                    e.target.classList.add('active');
+                    saveStateToLocalStorage();
                     renderTable();
                 }
             }
         });
-
-        function updateFooter() {
-            if (currentDataSource === 'metno') {
-                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.met.no/" target="_blank" class="text-blue-600 hover:underline">MET Norway</a>.`;
-            } else {
-                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.meteosource.com/" target="_blank" class="text-blue-600 hover:underline">Meteosource</a>.`;
-            }
-        }
-
+        
         window.removeLocation = (index) => {
             locations.splice(index, 1);
+            saveStateToLocalStorage();
             renderTable();
         }
 
@@ -413,12 +392,60 @@
             return formatted.charAt(0).toUpperCase() + formatted.slice(1);
         }
         
+        // --- Local Storage Functions ---
+        function saveStateToLocalStorage() {
+            localStorage.setItem('weatherAppLocations', JSON.stringify(locations));
+            localStorage.setItem('weatherAppSource', currentDataSource);
+        }
+
+        function loadStateFromLocalStorage() {
+            const savedLocations = localStorage.getItem('weatherAppLocations');
+            const savedSource = localStorage.getItem('weatherAppSource');
+
+            if (savedLocations) {
+                locations = JSON.parse(savedLocations);
+            } else {
+                // Výchozí lokality, pokud nic není uloženo
+                locations = [ { name: "Praha", lat: 50.07, lon: 14.43 }, { name: "Brno", lat: 49.19, lon: 16.60 } ];
+            }
+
+            if (savedSource) {
+                currentDataSource = savedSource;
+            }
+            updateToggleUI();
+        }
+        
+        function updateToggleUI() {
+            sourceToggle.querySelectorAll('.source-toggle-label').forEach(label => {
+                if (label.dataset.source === currentDataSource) {
+                    label.classList.add('active');
+                } else {
+                    label.classList.remove('active');
+                }
+            });
+        }
+
+        function updateFooter() {
+            if (currentDataSource === 'metno') {
+                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.met.no/" target="_blank" class="text-blue-600 hover:underline">MET Norway</a>.`;
+            } else {
+                footerSourceText.innerHTML = `Data o počasí poskytuje <a href="https://www.meteosource.com/" target="_blank" class="text-blue-600 hover:underline">Meteosource</a>.`;
+            }
+        }
+        
+        function checkLocationLimit() {
+            if (locations.length >= 5) {
+                addLocationForm.classList.add('disabled');
+                locationInput.placeholder = 'Dosažen maximální počet lokalit';
+            } else {
+                addLocationForm.classList.remove('disabled');
+                locationInput.placeholder = 'Zadejte název města...';
+            }
+        }
+
         function init() {
             addLocationForm.addEventListener('submit', handleFormSubmit);
-            locations = [
-                { name: "Praha", lat: 50.07, lon: 14.43 },
-                { name: "Brno", lat: 49.19, lon: 16.60 }
-            ];
+            loadStateFromLocalStorage();
             renderTable();
         }
 
